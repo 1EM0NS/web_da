@@ -30,7 +30,8 @@ class ClassifyModel:
         plt.figure(figsize=(20,10))
         encoder = LE()
         numerical_categories = encoder.fit_transform(self.model.predict(X))
-        plt.scatter(X[:, 0], X[:, 1], c=numerical_categories)
+        #标签
+        plt.scatter(X[:, 0], X[:, 1], c=numerical_categories,lengend=['SepL', 'SepW'])
         plt.savefig('../results/result.png')
 
         # 返回分类结果
