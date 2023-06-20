@@ -22,6 +22,7 @@ class ClusterModel:
         # 返回聚类结果
         return self.model.labels_
 
+
 if __name__=='__main__':
     #导入数据库
     cnx = pymysql.connect(host='localhost',
@@ -38,5 +39,3 @@ if __name__=='__main__':
     c = ClusterModel()
     c.cluster(df)
     cnx.close()
-#todo 数据从前端传入or后端从数据库中获取
-#todo 接口规范
