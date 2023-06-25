@@ -6,13 +6,15 @@ class RegressionModel:
     def __init__(self, degree):
         self.degree = degree
         self.model = LinearRegression()
+        self.X,self.y = None,None
     def generate_data(self, n_samples=100):
         # Generate random data for training
         #顺序数据
         X = np.sort(np.random.rand(n_samples)*10)
         X = X.squeeze()
         y = 3 * X.squeeze()* X.squeeze()* X.squeeze() + 5 + np.random.randn(n_samples)
-        return X, y
+        self.X,self.y = X,y
+        return self.X,self.y
 
     def train(self, X, y):
         # Transform the input data to include polynomial features up to the specified degree

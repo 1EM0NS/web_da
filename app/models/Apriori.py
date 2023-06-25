@@ -189,8 +189,6 @@ class AprioriModel:
         data = {}
         for num in range(0, len(list1)):
             data[list1[num]] = list3[num]
-        #         print(data)
-        #         print(list5[num])
         plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文标签
         plt.rcParams['axes.unicode_minus'] = False  # 这两行需要手动设置
         df = pd.DataFrame(data, index=list1, columns=list1)
@@ -209,7 +207,7 @@ class AprioriModel:
         confidence_data = self.confidence(DataList, Datanum, suppData)
         comfidence = self.datado(confidence_data)
         self.draw_seabornc(comfidence,list1, confidence_data)
-        plt.show()
+        # plt.show()
         Lift_data = self.Lift(DataList, confidence_data, Datanum, suppData)
         #     print(Lift_data)
         limit_data = self.limit(confidence_data, Lift_data)
@@ -217,7 +215,7 @@ class AprioriModel:
         for i in limit_data:
             print(i)
         x, y, data = self.draw_seaborn(suppData, L[0], list1)
-        plt.show()
+        # plt.show()
         return x, y, data
 
 
@@ -231,7 +229,7 @@ if __name__ == '__main__':
 
     L, suppData, supK =model.apriori(dataSet)
 
-    print(supK)
+    # print(supK)
     list1 = []
     for i in L[0]:
         for j in i:
@@ -243,13 +241,12 @@ if __name__ == '__main__':
     confidence_data = model.confidence(DataList, Datanum, suppData)
     comfidence = model.datado(confidence_data)
     model.draw_seabornc(comfidence,list1, confidence_data)
-    plt.show()
     Lift_data = model.Lift(DataList, confidence_data, Datanum, suppData)
     #     print(Lift_data)
     limit_data = model.limit(confidence_data, Lift_data)
     print('\n')
     for i in limit_data:
         print(i)
-    x,y,data = model.draw_seaborn(suppData, L[0], list1)
-    plt.show()
+    # x,y,data = model.draw_seaborn(suppData, L[0], list1)
+    # plt.show()
 

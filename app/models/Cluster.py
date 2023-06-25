@@ -16,13 +16,13 @@ class ClusterModel:
         self.data,self.labels = make_blobs(n_samples=100, n_features=2, centers=k, cluster_std=1.5, shuffle=True, random_state=42)
 
     def cluster(self):
-
         # 使用KMeans算法进行聚类分析
         self.model.fit(self.data)
-
         # 返回聚类结果
         return self.model.labels_,self.data
-
+    def r_data(self):
+        self.data,self.labels = make_blobs(n_samples=100, n_features=2, centers=self.k, cluster_std=1.5, shuffle=True, random_state=42)
+        return self.data,self.labels
 
 if __name__=='__main__':
     model = ClusterModel()
