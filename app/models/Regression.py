@@ -13,7 +13,6 @@ class RegressionModel:
         X, y, coef = datasets.make_regression(n_samples=n_samples, n_features=1,
                                               n_informative=1, noise=10,
                                               coef=True, random_state=0)
-
         # Add outlier data
         np.random.seed(0)
         X[:100] = 3 + 0.5 * np.random.normal(size=(100, 1))

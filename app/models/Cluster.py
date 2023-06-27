@@ -1,23 +1,42 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import pymysql
 from sklearn.datasets import make_circles, make_blobs, make_moons
 from sklearn.cluster import KMeans, DBSCAN
-
+from sklearn.decomposition import PCA
 
 class ClusterModel:
     def __init__(self):
         self.data = None
         self.labels = None
 
-    def generate_data(self):
-            self.circle_data, _ = make_circles(n_samples=1000, noise=0.05, factor=0.5)
-            self.blob_data, _ = make_blobs(n_samples=1000, centers=3)
-            self.moon_data, _ = make_moons(n_samples=1000, noise=0.05)
+    def mysql_to_df(self,sq_):
+        cnx = pymysql.connect(host='localhost',
+                              user='root',
+                              password='1784',
+                              database='data_')
+        cursor = cnx.cursor()
+        cursor.execute(sq_)
+        data_ = cursor.fetchall()
+        column_names = [desc[0] for desc in cursor.description]
+        # Create a DataFrame with the data and column names
+        df_ = pd.DataFrame(data_, columns=column_names)
+        cnx.close()
+        return df_
 
+    def generate_data(self):
+            self.circle_data, _ = make_circles(n_samples=100, noise=0.05, factor=0.5)
+            self.blob_data, _ = make_blobs(n_samples=100, centers=3)
+            self.moon_data, _ = make_moons(n_samples=100, noise=0.05)
+            df_iris = self.mysql_to_df("select * from iris")
+            #pca降维
+            pca = PCA(n_components=2)
+            self.iris_data = pca.fit_transform(df_iris.iloc[:,1:-1])
             return self.circle_data, self.blob_data, self.moon_data
 
     def kmeans_clustering(self,data, n_clusters=3):
-        kmeans = KMeans(n_clusters=3)
+        kmeans = KMeans(n_clusters=3,n_init='auto')
         labels = kmeans.fit_predict(data)
         return labels
 
@@ -40,5 +59,5 @@ class ClusterModel:
 if __name__ == '__main__':
     clustering = ClusterModel()
     clustering.generate_data()
-    label = clustering.dbscan_clustering(clustering.circle_data)
-    clustering.plot_clusters(clustering.circle_data,label)
+    label = clustering.dbscan_clustering(clustering.iris_data)
+    clustering.plot_clusters(clustering.iris_data,label)

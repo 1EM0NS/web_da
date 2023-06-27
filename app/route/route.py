@@ -10,7 +10,22 @@ import base64
 from flask_cors import CORS
 from flasgger import Swagger
 import os
-os.environ["OMP_NUM_THREADS"] = "4"
+
+
+def mysql_to_df(sq_):
+    cnx = pymysql.connect(host='localhost',
+                          user='root',
+                          password='1784',
+                          database='data_')
+    cursor = cnx.cursor()
+    cursor.execute(sq_)
+    data_ = cursor.fetchall()
+    column_names = [desc[0] for desc in cursor.description]
+    # Create a DataFrame with the data and column names
+    df_ = pd.DataFrame(data_, columns=column_names)
+    cnx.close()
+    return df_
+os.environ["OMP_NUM_THREADS"] = "1"
 app = Flask(__name__)
 Swagger(app)
 
@@ -100,25 +115,13 @@ def classify():
               description: Error occurred while retrieving data from the database
         """
     # mysql转df
-    def mysql_to_df(sq_):
-        cnx = pymysql.connect(host='localhost',
-                              user='root',
-                              password='1784',
-                              database='data_')
-        cursor = cnx.cursor()
-        cursor.execute(sq_)
-        data_ = cursor.fetchall()
-        column_names = [desc[0] for desc in cursor.description]
-        # Create a DataFrame with the data and column names
-        df_ = pd.DataFrame(data_, columns=column_names)
-        cnx.close()
-        return df_
-
     if request.method == 'POST':
 
         # 获取客户端传递的数据
         # noinspection PyTypeChecker
         data = request.get_json('data')
+        if 'height' not in data or 'leaf_samples' not in data:
+            return jsonify({'code': 400, 'msg': 'Invalid request body'})
         height = data['height']
         leaf_samples = data['leaf_samples']
         # 调用分类分析模型进行处理
@@ -163,41 +166,49 @@ def cluster():
     model = ClusterModel()
     model.generate_data()
     if request.method == 'POST':
+        # 获取客户端传递的数据
         data = request.get_json('data')
+        # 判断数据是否为空
+        if not data['model']:
+            return jsonify({'error': 'model is not defined'})
         mode = data['model']
+        # 调用分类分析模型进行处理
         if mode == 'kmeans':
             k = data['k']
             circle_label = model.kmeans_clustering(model.circle_data,k)
             blob_label = model.kmeans_clustering(model.blob_data,k)
             moon_label = model.kmeans_clustering(model.moon_data,k)
-            result = {
-                'circle_label': circle_label.tolist(),
-                'blob_label': blob_label.tolist(),
-                'moon_label': moon_label.tolist(),
-                'circle_data': model.circle_data.tolist(),
-                'blob_data': model.blob_data.tolist(),
-                'moon_data': model.moon_data.tolist()
-            }
+            iris_label = model.kmeans_clustering(model.iris_data,k)
         if mode == 'dbscan':
+            if not data['min_samples'] or not data['eps']:
+                return jsonify({'error': 'min_samples or eps is not defined'})
             min_samples = data['min_samples']
             eps = data['eps']
             circle_label = model.dbscan_clustering(model.circle_data,min_samples,eps)
             blob_label = model.dbscan_clustering(model.blob_data,min_samples,eps)
             moon_label = model.dbscan_clustering(model.moon_data,min_samples,eps)
-            result = {
-                'circle_label': circle_label.tolist(),
-                'blob_label': blob_label.tolist(),
-                'moon_label': moon_label.tolist(),
-                'circle_data': model.circle_data.tolist(),
-                'blob_data': model.blob_data.tolist(),
-                'moon_data': model.moon_data.tolist()
-            }
+            iris_label = model.dbscan_clustering(model.iris_data,min_samples,eps)
+
+        blob = [{'data': model.blob_data[i].tolist(), 'label': int(blob_label[i])} for i in range(len(blob_label))]
+        circle = [{'data': model.circle_data[i].tolist(), 'label': int(circle_label[i])} for i in range(len(circle_label))]
+        moon = [{'data': model.moon_data[i].tolist(), 'label': int(moon_label[i])} for i in range(len(moon_label))]
+        iris = [{'data': model.iris_data[i].tolist(), 'label': int(iris_label[i])} for i in range(len(iris_label))]
+
+        result = {
+            'circle': circle,
+            'blob': blob,
+            'moon': moon,
+            'iris': iris
+        }
         return jsonify(result)
     else:
+        sql = "select * from iris"
+        df = mysql_to_df(sql)
         result = {
             'circle_data': model.circle_data.tolist(),
             'blob_data': model.blob_data.tolist(),
-            'moon_data': model.moon_data.tolist()
+            'moon_data': model.moon_data.tolist(),
+            'iris_data': df.values.tolist()
         }
         return jsonify(result)
 
@@ -297,6 +308,7 @@ def apriori():
         data = request.get_json('data')
         min_support = data['min_support']
         min_confidence = data['min_confidence']
+        # 判断是否有缺失值
         if any([min_support is None, min_confidence is None]):
             min_support = 0.3
             min_confidence = 0.3
@@ -306,24 +318,20 @@ def apriori():
         #两位小数
         list2 = np.round(list2, 2).tolist()
         list3 = np.round(list3, 2).tolist()
-
-
-        #list转置
-        # list2 = list(map(list, zip(*list2)))
-        # list3 = list(map(list, zip(*list3)))
-
-
         result = {
             'label': list1,
             'confidence': list2,
-            'support': list3
+            'support': list3,
         }
         # 将处理结果返回给客户端
         return jsonify(result)
     else:
         model = AprioriModel(0.3, 0.3)
+        data = model.loadDataSet()
+        data_table = [{'item{}'.format(j):data[i][j] for j in range(len(data[i]))} for i in range(len(data))]
         result = {
-            'data': model.loadDataSet()
+            'data': data,
+            'data_table':data_table
         }
         return jsonify(result)
 
@@ -418,8 +426,8 @@ def regression():
               description: Error occurred during regression analysis
         """
     # 获取客户端传递的数据
-    # noinspection PyTypeChecker
     data = request.get_json('data')
+    # 检查数据是否有效
     if not data['n_samples']:
         return jsonify({'error': 'n_samples is required'})
     n_samples = data['n_samples']
