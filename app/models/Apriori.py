@@ -1,14 +1,11 @@
-
-from matplotlib import pyplot as plt
-import seaborn as sns
-import pandas as pd
-
+import matplotlib.pyplot as plt
 class AprioriModel:
-    def __init__(self, minSupport, minConf):
-        self.minSupport = minSupport
-        self.minConf = minConf
+    def __init__(self,min_support,min_confidence):
+        self.min_support = min_support
+        self.min_confidence = min_confidence
 
     def loadDataSet(self):
+
         return [['面包', '可乐', '麦片'], ['牛奶', '可乐'], ['牛奶', '面包', '麦片'], ['牛奶', '可乐'],
                 ['面包', '鸡蛋', '麦片'], ['牛奶', '面包', '可乐'], ['牛奶', '面包', '鸡蛋', '麦片'],
                 ['牛奶', '面包', '可乐'], ['面包', '可乐']]
@@ -16,7 +13,7 @@ class AprioriModel:
     # return [[1, 2, 3], [4, 2], [4,1, 3], [4, 2], [1,5, 3], [4,1, 2], [4,1,5,3], [4,1, 2],[1,2]]
 
     # 获取候选1项集，dataSet为事务集。返回一个list，每个元素都是set集合
-    def createC1(self, dataSet):
+    def createC1(self,dataSet):
         C1 = []  # 元素个数为1的项集（非频繁项集，因为还没有同最小支持度比较）
         for transaction in dataSet:
             for item in transaction:
@@ -24,15 +21,12 @@ class AprioriModel:
                     C1.append([item])
         C1.sort()  # 这里排序是为了，生成新的候选集时可以直接认为两个n项候选集前面的部分相同
         # 因为除了候选1项集外其他的候选n项集都是以二维列表的形式存在，所以要将候选1项集的每一个元素都转化为一个单独的集合。
-        return list(map(frozenset, C1))  # map(frozenset, C1)的语义是将C1由Python
-
-
-
+        return list(map(frozenset, C1))  # map(frozenset, C1)的语义是将C1由Python列表转换为不变集合（frozenset，Python中的数据结构）
 
 
     # 找出候选集中的频繁项集
     # dataSet为全部数据集，Ck为大小为k（包含k个元素）的候选项集，minSupport为设定的最小支持度
-    def scanD(self,dataSet, Ck):
+    def scanD(self,dataSet, Ck, minSupport):
         ssCnt = {}  # 记录每个候选项的个数
         for tid in dataSet:
             for can in Ck:
@@ -43,14 +37,14 @@ class AprioriModel:
         supportData = {}
         for key in ssCnt:
             support = ssCnt[key] / numItems
-            if support >= self.minSupport:
+            if support >= minSupport:
                 retList.insert(0, key)  # 将频繁项集插入返回列表的首部
                 supportData[key] = support
         return retList, supportData  # retList为在Ck中找出的频繁项集（支持度大于minSupport的），supportData记录各频繁项集的支持度
 
 
     # 通过频繁项集列表Lk和项集个数k生成候选项集C(k+1)。
-    def aprioriGen(sef,Lk, k):
+    def aprioriGen(self,Lk, k):
         retList = []
         lenLk = len(Lk)
         for i in range(lenLk):
@@ -63,25 +57,21 @@ class AprioriModel:
                 if L1 == L2:
                     retList.append(Lk[i] | Lk[j])
         return retList
-
-
     # 获取事务集中的所有的频繁项集
     # Ck表示项数为k的候选项集，最初的C1通过createC1()函数生成。Lk表示项数为k的频繁项集，supK为其支持度，Lk和supK由scanD()函数通过Ck计算而来。
-    def apriori(self,dataSet):
+    def apriori(self,dataSet, minSupport=0.5):
         C1 = self.createC1(dataSet)  # 从事务集中获取候选1项集
         D = list(map(set, dataSet))  # 将事务集的每个元素转化为集合
-        L1, supportData = self.scanD(D, C1,)  # 获取频繁1项集和对应的支持度
+        L1, supportData = self.scanD(D, C1, minSupport)  # 获取频繁1项集和对应的支持度
         L = [L1]  # L用来存储所有的频繁项集
         k = 2
         for k in range(2, 3):  # 一直迭代到项集数目过大而在事务集中不存在这种n项集
             Ck = self.aprioriGen(L[k - 2], k)  # 根据频繁项集生成新的候选项集。Ck表示项数为k的候选项集
-            Lk, supK = self.scanD(D, Ck)  # Lk表示项数为k的频繁项集，supK为其支持度
+            Lk, supK = self.scanD(D, Ck, minSupport)  # Lk表示项数为k的频繁项集，supK为其支持度
             L.append(Lk);
             supportData.update(supK)  # 添加新频繁项集和他们的支持度
             k += 1
         return L, supportData, supK
-
-
     def draw_seaborn(self,suppData, n, list5):
         list1 = []
         list2 = []
@@ -98,18 +88,17 @@ class AprioriModel:
                 else:
                     list4.append(0.00)
             list3.append(list4)
-        data = {}
-        for num in range(len(n)):
-            data[list5[num]] = list3[num]
-        #         print(data)
-        #         print(list5[num])
-        plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文标签
-        plt.rcParams['axes.unicode_minus'] = False  # 这两行需要手动设置
-        df = pd.DataFrame(data, index=list5, columns=list5)
-        sns.heatmap(df, annot=True, annot_kws={"size": 7})
-        return list1,list2,list3
-
-
+        # data = {}
+        # for num in range(len(n)):
+        #     data[list5[num]] = list3[num]
+        return list3
+        #     print(data)
+        #     print(list5[num])
+        # plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文标签
+        # plt.rcParams['axes.unicode_minus'] = False  # 这两行需要手动设置
+        #
+        # df = pd.DataFrame(data, index=list5, columns=list5)
+        # return sns.heatmap(df, annot=True, annot_kws={"size": 7})
     def data_deal(self,L, suppData, list1):
         min = -1
         DataList = []
@@ -127,50 +116,58 @@ class AprioriModel:
             Datanum[j] = L[0][m]
             m += 1
         return DataList, Datanum
-
-
-    def confidence(self,DataList, Datanum, suppData):
+    def confidence_limit(self,minConfidence, data):
+        if data >= minConfidence:
+            return True
+        else:
+            return False
+    def confidence(self,DataList, Datanum, suppData, minConfidence):
         confidence_data = {}
         for num in range(len(DataList)):
             str1 = ''
             str2 = ''
             str1 = str(DataList[num][1]) + '->' + str(DataList[num][2])
-            confidence_data[str1] = DataList[num][0] / suppData[Datanum[DataList[num][1]]]
             str2 = str(DataList[num][2]) + '->' + str(DataList[num][1])
-            confidence_data[str2] = DataList[num][0] / suppData[Datanum[DataList[num][2]]]
+            confidence_str1 = DataList[num][0] / suppData[Datanum[DataList[num][1]]]
+            confidence_str2 = DataList[num][0] / suppData[Datanum[DataList[num][2]]]
+            if self.confidence_limit(minConfidence, confidence_str1):
+                confidence_data[str1] = confidence_str1
+            if self.confidence_limit(minConfidence, confidence_str2):
+                confidence_data[str2] = confidence_str2
         return confidence_data
-
-
     def Lift(self,DataList, confidence_data, Datanum, suppData):
         Lift_data = {}
         for num in range(len(DataList)):
             str1 = ''
             str2 = ''
             str1 = str(DataList[num][1]) + '->' + str(DataList[num][2])
-            Lift_data[str1] = confidence_data[str1] / suppData[Datanum[DataList[num][2]]]
+            if str1 in confidence_data:
+                Lift_data[str1] = confidence_data[str1] / suppData[Datanum[DataList[num][2]]]
             str2 = str(DataList[num][2]) + '->' + str(DataList[num][1])
-            Lift_data[str2] = confidence_data[str2] / suppData[Datanum[DataList[num][1]]]
+            if str2 in confidence_data:
+                Lift_data[str2] = confidence_data[str2] / suppData[Datanum[DataList[num][1]]]
         return Lift_data
-
-
-    def limit(self,confidence_data, Lift_data):
+    def limit(self,confidence_data, Lift_data, minConfidence=0.5):
         limit_data = []
         for k in confidence_data.keys():
             data = []
-            if confidence_data[k] >= self.minConf:
+            if confidence_data[k] >= minConfidence:
                 data.append(k)
                 data.append(confidence_data[k])
                 data.append(Lift_data[k])
                 limit_data.append(data)
         return limit_data
-
-
     def datado(self,confidence_data):
-        data = list(confidence_data.keys())
+        data = list(confidence_data.keys())  # 获取所有置信度的key即“”->""
         #   print(data)
         return data
-
-
+    def datalist(self,L):
+        list1 = []
+        for i in L:
+            for j in i:
+                if j not in list1:
+                    list1.append(j)
+        return list1
     def draw_seabornc(self,comfidence, list1, confidence_data):
         list3 = []
         for i in list1:
@@ -185,68 +182,59 @@ class AprioriModel:
                     else:
                         list2.append(0.00)
             list3.append(list2)
-        #    print(list3)
+        return list3
         data = {}
-        for num in range(0, len(list1)):
+        for num in range(0, 5):
             data[list1[num]] = list3[num]
+        #         print(data)
+        #         print(list5[num])
         plt.rcParams['font.sans-serif'] = ['SimHei']  # 显示中文标签
         plt.rcParams['axes.unicode_minus'] = False  # 这两行需要手动设置
         df = pd.DataFrame(data, index=list1, columns=list1)
         return sns.heatmap(df, annot=True, annot_kws={"size": 7})
-    def apriori_demo(self):
-
-        dataSet = self.loadDataSet()  # 获取事务集。每个元素都是列表
-        L, suppData, supK = self.apriori(dataSet)
-        print(supK)
-        list1 = []
-        for i in L[0]:
+    def data_net(self,list3):
+        list4 = []
+        a = -1
+        for i in list3:
+            a += 1
+            b = 0
             for j in i:
-                if j not in list1:
-                    list1.append(j)
+                t = [a, b, j]
+                list4.append(t)
+                if b <= len(i):
+                    b += 1
+        return list4
+    def serborn_get(self):
+        dataSet = self.loadDataSet()  # 获取事务集。每个元素都是列表
+        # print(createC1(dataSet))  # 获取候选1项集。每个元素都是集合
+        # D = list(map(set, dataSet))  # 转化事务集的形式，每个元素都转化为集合。
+        # L1, suppDat = scanD(D, C1, 0.5)
+        # print(L1,suppDat)
+
+        L, suppData, supK = self.apriori(dataSet, minSupport=self.min_support)
+        list1 = []
+        list1 = self.datalist(L[0])
+        list2 = self.draw_seaborn(suppData, L[0], list1)
         DataList, Datanum = self.data_deal(L, suppData, list1)
-        confidence_data = self.confidence(DataList, Datanum, suppData)
+        confidence_data = self.confidence(DataList, Datanum, suppData,minConfidence=self.min_confidence)
         comfidence = self.datado(confidence_data)
-        self.draw_seabornc(comfidence,list1, confidence_data)
-        # plt.show()
+        list3 = self.draw_seabornc(comfidence, list1, confidence_data)
+        list3 = self.data_net(list3)
+        list4 = self.data_net(list2)
+
+        plt.show()
         Lift_data = self.Lift(DataList, confidence_data, Datanum, suppData)
         #     print(Lift_data)
-        limit_data = self.limit(confidence_data, Lift_data)
+        limit_data = self.limit(confidence_data, Lift_data, minConfidence=self.min_confidence)
         print('\n')
-        for i in limit_data:
-            print(i)
-        x, y, data = self.draw_seaborn(suppData, L[0], list1)
+        # for i in limit_data:
+        #     print(i)
+        self.draw_seaborn(suppData, L[0], list1)
         # plt.show()
-        return x, y, data
-
+        # return list1, list4
+        return list1,list3,list4
 
 if __name__ == '__main__':
-    model = AprioriModel(minSupport=0.2, minConf=0.2)
-    dataSet = model.loadDataSet()  # 获取事务集。每个元素都是列表
-    # print(createC1(dataSet))  # 获取候选1项集。每个元素都是集合
-    # D = list(map(set, dataSet))  # 转化事务集的形式，每个元素都转化为集合。
-    # L1, suppDat = scanD(D, C1, 0.5)
-    # print(L1,suppDat)
-
-    L, suppData, supK =model.apriori(dataSet)
-
-    # print(supK)
-    list1 = []
-    for i in L[0]:
-        for j in i:
-            if j not in list1:
-                list1.append(j)
-
-    DataList, Datanum = model.data_deal(L, suppData, list1)
-
-    confidence_data = model.confidence(DataList, Datanum, suppData)
-    comfidence = model.datado(confidence_data)
-    model.draw_seabornc(comfidence,list1, confidence_data)
-    Lift_data = model.Lift(DataList, confidence_data, Datanum, suppData)
-    #     print(Lift_data)
-    limit_data = model.limit(confidence_data, Lift_data)
-    print('\n')
-    for i in limit_data:
-        print(i)
-    # x,y,data = model.draw_seaborn(suppData, L[0], list1)
-    # plt.show()
-
+    model = AprioriModel(0.4,1)
+    list1,list2,list3 = model.serborn_get()
+    print(list1,list2,list3,sep='\n')
