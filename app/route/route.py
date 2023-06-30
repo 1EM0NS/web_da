@@ -32,88 +32,7 @@ Swagger(app)
 CORS(app, resources=r'/*', supports_credentials=True)
 @app.route('/classify', methods=['POST', 'GET'])
 def classify():
-    """
-        分类接口
-        ---
-        tags:
-            - 分类接口
-        post:
-          summary: Perform classification analysis on iris dataset
-          description: |
-            This endpoint performs classification analysis on the iris dataset using the provided parameters and returns the decision tree, result image, and classification results.
-          parameters:
-            - name: body
-              in: body
-              required: true
-              schema:
-                id: Classify
-                required:
-                    - height
-                    - leaf_samples
-                properties:
-                    height:
-                        type: integer
-                        description: The height of the decision tree
-                    leaf_samples:
-                        type: integer
-                        description: The minimum number of samples required to be at a leaf node
-        definitions:
-          Classify:
-            type: object
-            properties:
-              height:
-                type: integer
-                description: The height of the decision tree
-              leaf_samples:
-                type: integer
-                description: The minimum number of samples required to be at a leaf node
-        responses:
-            200:
-              description: Successfully performed classification analysis
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    properties:
-                      decision_tree:
-                        type: string
-                        description: The base64-encoded PNG image of the decision tree
-                      result_img:
-                        type: string
-                        description: The base64-encoded PNG image of the classification result
-                      result:
-                        type: array
-                        description: The classification result
-                        items:
-                          type: number
-                  example:
-                    decision_tree: "iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAABZ0RVh0Q3JlYXRpb24gVGltZQAxNjEwNzYwNzYyNTYy.png"
-                    result_img: "iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAABZ0RVh0Q3JlYXRpb24gVGltZQAxNjEwNzYwNzYyNTYy.png"
-                    result: [0, 1, 2, 0, 1, 2, ...]
-            400:
-              description: Invalid request body
-            500:
-              description: Error occurred during classification analysis
-        get:
-          summary: Get iris dataset
-          description: |
-            This endpoint retrieves the iris dataset from the database and returns it as a list of lists.
-        responses:
-            200:
-              description: Successfully retrieved iris dataset
-              content:
-                application/json:
-                  schema:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: string
-                  example:
-                    [["5.1", "3.5", "1.4", "0.2", "Iris-setosa"], ["4.9", "3.0", "1.4", "0.2", "Iris-setosa"], ...]
-            500:
-              description: Error occurred while retrieving data from the database
-        """
+
     # mysql转df
     if request.method == 'POST':
 
@@ -127,8 +46,7 @@ def classify():
         # 调用分类分析模型进行处理
         model = ClassifyModel(height, leaf_samples)
         # 获取数据
-        sql = "select * from iris"
-        df = mysql_to_df(sql)
+        df = mysql_to_df("select * from iris")
         # 结果
         result = model.classify(df)
         # base64编码
@@ -174,25 +92,25 @@ def cluster():
         mode = data['model']
         # 调用分类分析模型进行处理
         if mode == 'kmeans':
+            if not data['k']:
+                return jsonify({'error': 'k is not defined'})
             k = data['k']
-            circle_label = model.kmeans_clustering(model.circle_data,k)
-            blob_label = model.kmeans_clustering(model.blob_data,k)
-            moon_label = model.kmeans_clustering(model.moon_data,k)
-            iris_label = model.kmeans_clustering(model.iris_data,k)
+            circle_label,blob_label,moon_label,iris_label = model.k_clustering(k)
+
         if mode == 'dbscan':
             if not data['min_samples'] or not data['eps']:
                 return jsonify({'error': 'min_samples or eps is not defined'})
             min_samples = data['min_samples']
             eps = data['eps']
-            circle_label = model.dbscan_clustering(model.circle_data,min_samples,eps)
-            blob_label = model.dbscan_clustering(model.blob_data,min_samples,eps)
-            moon_label = model.dbscan_clustering(model.moon_data,min_samples,eps)
-            iris_label = model.dbscan_clustering(model.iris_data,min_samples,eps)
-
+            circle_label,blob_label,moon_label,iris_label = model.d_clustering(eps, min_samples)
+            # model.plot_clusters(model.circle_data, circle_label)
+            # model.plot_clusters(model.blob_data, blob_label)
+            # model.plot_clusters(model.moon_data, moon_label)
+            # model.plot_clusters(model.iris_data_pca, iris_label)
         blob = [{'data': model.blob_data[i].tolist(), 'label': int(blob_label[i])} for i in range(len(blob_label))]
         circle = [{'data': model.circle_data[i].tolist(), 'label': int(circle_label[i])} for i in range(len(circle_label))]
         moon = [{'data': model.moon_data[i].tolist(), 'label': int(moon_label[i])} for i in range(len(moon_label))]
-        iris = [{'data': model.iris_data[i].tolist(), 'label': int(iris_label[i])} for i in range(len(iris_label))]
+        iris = [{'data': model.iris_data_pca[i].tolist(), 'label': int(iris_label[i])} for i in range(len(iris_label))]
 
         result = {
             'circle': circle,
@@ -202,107 +120,17 @@ def cluster():
         }
         return jsonify(result)
     else:
-        sql = "select * from iris"
-        df = mysql_to_df(sql)
         result = {
             'circle_data': model.circle_data.tolist(),
             'blob_data': model.blob_data.tolist(),
             'moon_data': model.moon_data.tolist(),
-            'iris_data': df.values.tolist()
+            'iris_data': model.iris_data.values.tolist(),
         }
         return jsonify(result)
 
-
-
 @app.route('/aprior', methods=['POST','GET'])
 def apriori():
-    """
-        ---
-        tags:
-            - 关联分析接口
-        post:
-          summary: Perform association analysis on transaction data
-          description:
-            关联分析接口，json格式
-          parameters:
-            - name: body
-              in: body
-              required: true
-              schema:
-                id: 关联分析参数
-                required:
-                    - min_support
-                    - min_confidence
-                properties:
-                    min_support:
-                        type: integer
-                        description: The minimum support threshold for the association rules
-                    min_confidence:
-                        type: integer
-                        description: The minimum confidence threshold for the association rules
-        definitions:
-          关联分析参数:
-            type: object
-            properties:
-              min_support:
-                type: number
-                description: The minimum support threshold
-                default: 0.5
-              min_confidence:
-                type: number
-                description: The minimum confidence threshold
-                default: 0.5
-        responses:
-            200:
-              description: Successfully performed association analysis
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    properties:
-                      x:
-                        type: array
-                        description: The support values of the association rules
-                        items:
-                          type: number
-                      y:
-                        type: array
-                        description: The confidence values of the association rules
-                        items:
-                          type: number
-                      data:
-                        type: array
-                        description: The lift values of the association rules
-                        items:
-                          type: number
-                  example:
-                    x: [0.1, 0.2, 0.3, ...]
-                    y: [0.5, 0.6, 0.7, ...]
-                    data: [1.0, 1.2, 1.4, ...]
-            400:
-              description: Invalid request body
-            500:
-              description: Error occurred during association analysis
-        get:
-          summary: Get transaction data
-          description: |
-            This endpoint retrieves the transaction data from the database and returns it as a list of lists.
-          responses:
-            '200':
-              description: Successfully retrieved transaction data
-              content:
-                application/json:
-                  schema:
-                    type: array
-                    items:
-                      type: array
-                      items:
-                        type: string
-                  example:
-                    [["apple", "banana", "orange"], ["apple", "banana"], ...]
-            '500':
-              description: Error occurred while retrieving data from the database
-        """
+
     if request.method== 'POST':
         # 获取客户端传递的数据
         data = request.get_json('data')
@@ -337,94 +165,6 @@ def apriori():
 
 @app.route('/regression', methods=['POST'])
 def regression():
-    """
-        ---
-        tags:
-            - 回归分析接口
-        post:
-          summary: Perform regression analysis on generated data
-          description: |
-            This endpoint generates data based on the provided parameters, trains a regression model on the generated data, and returns the coefficients of the trained model.
-          parameters:
-            - name: body
-              in: body
-              required: true
-              schema:
-                id: 回归分析参数
-                required:
-                    - n_samples
-                    - degree
-                properties:
-                    n_samples:
-                        type: integer
-                        description: The number of data samples to generate
-                    degree:
-                        type: integer
-                        description: The degree of the polynomial to fit to the generated data
-        definitions:
-          回归分析参数:
-            type: object
-            properties:
-              n_samples:
-                type: integer
-                description: The number of data samples to generate
-                default: 100
-              degree:
-                type: integer
-                description: The degree of the polynomial to fit to the generated data
-                default: 2
-          requestBody:
-            required: true
-            content:
-              application/json:
-                schema:
-                  type: object
-                  properties:
-                    n_samples:
-                      type: integer
-                      description: The number of data samples to generate
-                    degree:
-                      type: integer
-                      description: The degree of the polynomial to fit to the generated data
-                  example:
-                    n_samples: 100
-                    degree: 2
-        responses:
-            200:
-              description: Successfully performed regression analysis
-              content:
-                application/json:
-                  schema:
-                    type: object
-                    properties:
-                      x:
-                        type: array
-                        description: The generated x values
-                        items:
-                          type: number
-                      y:
-                        type: array
-                        description: The generated y values
-                        items:
-                          type: number
-                      w:
-                        type: array
-                        description: The coefficients of the trained model
-                        items:
-                          type: number
-                      b:
-                        type: number
-                        description: The intercept of the trained model
-                  example:
-                    x: [0.0, 0.010101010101010102, 0.020202020202020204, ...]
-                    y: [0.0, 0.010101010101010102, 0.020202020202020204, ...]
-                    w: [0.0, 1.0000000000000002, -0.0]
-                    b: 0.0
-            400:
-              description: Invalid request body
-            500:
-              description: Error occurred during regression analysis
-        """
     # 获取客户端传递的数据
     data = request.get_json('data')
     # 检查数据是否有效
